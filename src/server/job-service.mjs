@@ -29,13 +29,11 @@ export function createJobService({ adapters = {} } = {}) {
 
       try {
         const accepted = await adapter.submit(request, { jobId: job.id })
-        const nextStatus = accepted?.status === 'running' ? 'running' : 'queued'
-        const updated = transitionJob(job, nextStatus)
+        const updated = accepted?.status === 'running' ? transitionJob(job, 'running') : job
         jobs.set(job.id, updated)
         return updated
       } catch (error) {
-        const failed = transitionJob(job, 'failed')
-        jobs.set(job.id, failed)
+        jobs.set(job.id, transitionJob(job, 'failed'))
         throw error
       }
     },
