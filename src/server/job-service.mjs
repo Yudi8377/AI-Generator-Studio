@@ -29,7 +29,10 @@ export function createJobService({ adapters = {} } = {}) {
 
       try {
         const accepted = await adapter.submit(request, { jobId: job.id })
-        const updated = accepted?.status === 'running' ? transitionJob(job, 'running') : job
+        const updated = Object.freeze({
+          ...(accepted?.status === 'running' ? transitionJob(job, 'running') : job),
+          ...(typeof accepted?.externalId === 'string' ? { externalId: accepted.externalId } : {}),
+        })
         jobs.set(job.id, updated)
         return updated
       } catch (error) {
