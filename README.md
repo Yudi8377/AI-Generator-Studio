@@ -3,7 +3,7 @@
 Hybrid-ready workspace for AI image generation, restoration, upscaling, video, face tools, and 3D workflows.
 
 ## Current status
-This is an initial UI and architecture MVP. The frontend scaffold is not connected to AI inference, cloud-provider calls, GPU jobs, or production persistence yet.
+The React/Vite frontend and a small Node.js API scaffold are present. The API can validate requests and enforce adapter availability, but no real AI inference provider, GPU worker, or production persistence is configured. Do not interpret API health as inference readiness.
 
 ## Priorities
 1. Image generation
@@ -15,9 +15,10 @@ This is an initial UI and architecture MVP. The frontend scaffold is not connect
 
 ## Architecture
 - Web UI: React + TypeScript + Vite.
-- Metadata: Neon PostgreSQL.
-- Inference: provider-neutral adapters, local worker, and optional cloud adapters after license/cost/security review.
-- Job contract: workflow, prompt, execution mode, optional source metadata, and explicit lifecycle transitions.
+- Local API: Node.js built-in HTTP server, bound to 127.0.0.1 by default.
+- Job service: provider-neutral contract with local/cloud adapter slots and explicit errors when no adapter is configured.
+- Metadata target: Neon PostgreSQL, pending schema review and migration.
+- Inference: local worker first where hardware permits; optional cloud adapters only after license, security, and cost review.
 - Secrets: provider credentials stay server-side; never commit credentials or .env files.
 
 Neon provides database infrastructure, not GPU inference by itself. Local inference requires compatible hardware and model weights. Cloud inference may incur costs and must be opt-in.
@@ -25,27 +26,45 @@ Neon provides database infrastructure, not GPU inference by itself. Local infere
 ## Development
 Requirements: Node.js 20+ and npm.
 
+Install dependencies:
+
     npm install
+
+Terminal 1 — API:
+
+    npm run dev:api
+
+Terminal 2 — frontend:
+
     npm run dev
+
+API health check: http://127.0.0.1:8787/healthz. It intentionally reports inference as not-configured until an actual provider adapter is installed.
+
+Run tests and build:
+
     npm test
     npm run build
 
-The initial contract tests use Node.js's built-in test runner and do not require an extra test framework.
+The API returns HTTP 503 INFERENCE_ADAPTER_UNAVAILABLE for job submission until the requested local/cloud adapter is configured. This is deliberate fail-closed behavior; no fake media or false success is returned. The in-memory job store is development-only and is lost when the process restarts.
 
-## License and attribution
-The upstream DJNormality/AI_Generator project was reviewed as a reference. Its MIT license permits reuse of covered code subject to retaining its copyright and permission notice. Third-party code, model weights, datasets, fonts, and APIs need separate license review; an upstream code license does not automatically license those assets. Do not copy model weights or private media into this repository.
-
-## Safety and privacy
+## Safety and deployment boundaries
+- The API is local-only by default. Do not set ALLOW_PUBLIC_BIND=1 on a public server without adding authentication, rate limits, request limits, and deployment-specific security controls.
+- Do not send private media to a provider without user consent and clear retention terms.
 - Process only media you own or have permission to use.
 - Do not use face tools to impersonate, deceive, or violate privacy.
-- Keep uploaded media private by default and define retention/deletion before production storage.
 - Label synthetic or materially edited media when appropriate.
-- Never expose provider keys in browser code.
+- No API key should ever be embedded in browser code.
+- GitHub Pages can serve the static UI, but it cannot host this Node API. A separate server/runtime is required for remote API access.
+
+## License and attribution
+The upstream DJNormality/AI_Generator project was reviewed as a reference. Its MIT license permits reuse of covered code subject to retaining its copyright and permission notice. Third-party code, model weights, datasets, fonts, and APIs need separate license review; an upstream code license does not automatically license those assets. No model weights or private media are bundled here.
 
 ## Milestones
 - [x] Frontend scaffold and build CI
-- [x] Provider-neutral job request contract and lifecycle transition tests added to CI
-- [ ] Server API and reviewed, non-destructive Neon migrations
-- [ ] Local-worker adapter and health checks
+- [x] Provider-neutral job request contract and lifecycle transition tests
+- [x] Local Node API scaffold, health endpoint, job request validation, and adapter-unavailable response
+- [x] Automated tests for job service and HTTP error handling
+- [ ] Real local inference adapter and worker health checks
 - [ ] Opt-in cloud adapters with per-job cost estimates
-- [ ] Real integration tests for each media workflow
+- [ ] Neon schema and migration on a review branch
+- [ ] Authenticated production API and end-to-end tests
