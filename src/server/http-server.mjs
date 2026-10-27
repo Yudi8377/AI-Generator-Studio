@@ -55,7 +55,7 @@ export function createApiServer({ jobService = createJobService(), inference = '
       }
     }
 
-    const match = request.method === 'GET' && url.pathname.match(/^\\/api\\/jobs\\/([0-9a-f-]{36})$/i)
+    const match = request.method === 'GET' && url.pathname.match(/^\/api\/jobs\/([0-9a-f-]{36})$/i)
     if (match) {
       const job = jobService.get(match[1])
       return job
