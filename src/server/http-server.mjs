@@ -1,5 +1,7 @@
 import { createServer } from 'node:http'
+import { readFileSync } from 'node:fs'
 import { createJobService } from './job-service.mjs'
+import { createComfyUIAdapter } from './comfyui-adapter.mjs'
 
 const MAX_BODY_BYTES = 32 * 1024
 
@@ -33,12 +35,12 @@ async function readJson(request) {
   }
 }
 
-export function createApiServer({ jobService = createJobService() } = {}) {
+export function createApiServer({ jobService = createJobService(), inference = 'not-configured' } = {}) {
   return createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
 
     if (request.method === 'GET' && url.pathname === '/healthz') {
-      return sendJson(response, 200, { ok: true, service: 'ai-generator-studio-api', inference: 'not-configured' })
+      return sendJson(response, 200, { ok: true, service: 'ai-generator-studio-api', inference })
     }
 
     if (request.method === 'POST' && url.pathname === '/api/jobs') {
@@ -53,7 +55,7 @@ export function createApiServer({ jobService = createJobService() } = {}) {
       }
     }
 
-    const match = request.method === 'GET' && url.pathname.match(/^\/api\/jobs\/([0-9a-f-]{36})$/i)
+    const match = request.method === 'GET' && url.pathname.match(/^\\/api\\/jobs\\/([0-9a-f-]{36})$/i)
     if (match) {
       const job = jobService.get(match[1])
       return job
@@ -65,6 +67,25 @@ export function createApiServer({ jobService = createJobService() } = {}) {
   })
 }
 
+function configuredAdapters() {
+  const baseUrl = process.env.COMFYUI_URL
+  const workflowPath = process.env.COMFYUI_WORKFLOW_PATH
+  const promptNodeId = process.env.COMFYUI_PROMPT_NODE_ID
+  if (!baseUrl && !workflowPath && !promptNodeId) return { adapters: {}, inference: 'not-configured' }
+  if (!baseUrl || !workflowPath || !promptNodeId) {
+    throw new Error('Configure COMFYUI_URL, COMFYUI_WORKFLOW_PATH, and COMFYUI_PROMPT_NODE_ID together')
+  }
+
+  const workflow = JSON.parse(readFileSync(workflowPath, 'utf8'))
+  const adapter = createComfyUIAdapter({
+    baseUrl,
+    workflow,
+    promptNodeId,
+    promptInput: process.env.COMFYUI_PROMPT_INPUT || 'text',
+  })
+  return { adapters: { local: adapter }, inference: 'comfyui-configured' }
+}
+
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const host = process.env.HOST || '127.0.0.1'
   const port = Number.parseInt(process.env.PORT || '8787', 10)
@@ -72,7 +93,8 @@ if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
     throw new Error('Public bind is disabled by default. Set ALLOW_PUBLIC_BIND=1 only behind a secured deployment.')
   }
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be between 1 and 65535')
-  createApiServer().listen(port, host, () => {
-    process.stdout.write(`AI Generator Studio API listening on http://${host}:${port}\n`)
+  const { adapters, inference } = configuredAdapters()
+  createApiServer({ jobService: createJobService({ adapters }), inference }).listen(port, host, () => {
+    process.stdout.write(`AI Generator Studio API listening on http://${host}:${port} (inference: ${inference})\\n`)
   })
 }
