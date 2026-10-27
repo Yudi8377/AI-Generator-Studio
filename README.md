@@ -46,7 +46,7 @@ Without ComfyUI configuration, API health reports `inference: "not-configured"` 
 - `COMFYUI_PROMPT_NODE_ID`: node ID in that workflow whose input will receive the prompt.
 - `COMFYUI_PROMPT_INPUT`: optional input field name; defaults to `text`.
 
-All three required variables must be supplied together. The configured node and input field must exist in the workflow. Workflow JSON is user-supplied; ensure it is compatible with the installed ComfyUI nodes and model files. The adapter sends a prompt to ComfyUI's `/prompt` endpoint and records the returned `prompt_id`. Completion polling, output retrieval, image/video rendering, cancellation, and durable job storage are not implemented yet.
+All three required variables must be supplied together. The configured node and input field must exist in the workflow. Workflow JSON is user-supplied; ensure it is compatible with the installed ComfyUI nodes and model files. The adapter sends a prompt to ComfyUI's `/prompt` endpoint and records the returned `prompt_id`. The status endpoint now polls ComfyUI history and queue, updates the job to running/succeeded/failed, and returns output file metadata. It does not yet serve or download the media files themselves, and output metadata is not a public URL. Cancellation and durable job storage are not implemented yet.
 
 For security, keep ComfyUI and this API on a trusted local network. Do not expose ComfyUI directly to the public internet. Do not set `ALLOW_PUBLIC_BIND=1` on a public server without authentication, rate limiting, and deployment-specific security controls.
 
