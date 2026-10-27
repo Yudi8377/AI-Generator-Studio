@@ -57,7 +57,7 @@ export function createApiServer({ jobService = createJobService(), inference = '
 
     const match = request.method === 'GET' && url.pathname.match(/^\/api\/jobs\/([0-9a-f-]{36})$/i)
     if (match) {
-      const job = jobService.get(match[1])
+      const job = await jobService.get(match[1])
       return job
         ? sendJson(response, 200, { job })
         : sendJson(response, 404, { error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } })
