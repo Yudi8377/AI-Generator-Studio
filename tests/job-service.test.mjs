@@ -53,7 +53,7 @@ test('marks adapter submission failures as failed jobs before returning the erro
     },
   })
   await assert.rejects(service.submit(request), /worker offline/)
-  assert.equal(service.get(jobId).status, 'failed')
+  assert.equal((await service.get(jobId)).status, 'failed')
 })
 
 test('polls external jobs and stores succeeded output metadata', async () => {
