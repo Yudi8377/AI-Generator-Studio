@@ -31,7 +31,7 @@ async function serveStatic(request, response, staticDir, pathname) {
   } catch {
     return sendJson(response, 400, { error: { code: 'INVALID_PATH', message: 'Invalid URL path' } })
   }
-  const relative = decoded.replace(/^\\/+/, '')
+  const relative = decoded.replace(/^\/+/, '')
   if (relative.split(/[\\/]/).some((part) => part === '..' || part.startsWith('.'))) {
     return sendJson(response, 400, { error: { code: 'INVALID_PATH', message: 'Invalid static path' } })
   }
