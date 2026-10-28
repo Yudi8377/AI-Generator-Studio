@@ -90,3 +90,48 @@ test('reports running status when prompt appears in ComfyUI running queue', asyn
   assert.deepEqual(await adapter.inspect('comfy-prompt-123'), { status: 'running' })
   assert.equal(count, 2)
 })
+
+
+test('downloads only validated output metadata with bounded binary response', async () => {
+  let requested
+  const adapter = createComfyUIAdapter({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    promptNodeId: '6',
+    fetchImpl: async (url) => {
+      requested = new URL(url)
+      return new Response(new Uint8Array([137, 80, 78, 71]), { status: 200, headers: { 'content-type': 'image/png' } })
+    },
+  })
+  const output = await adapter.downloadOutput({ filename: 'render.png', subfolder: 'output/day1', contentType: 'output' })
+  assert.equal(requested.pathname, '/view')
+  assert.equal(requested.searchParams.get('filename'), 'render.png')
+  assert.equal(requested.searchParams.get('subfolder'), 'output/day1')
+  assert.equal(requested.searchParams.get('type'), 'output')
+  assert.equal(output.contentType, 'image/png')
+  assert.deepEqual([...output.body], [137, 80, 78, 71])
+})
+
+test('rejects path traversal and unsupported output types without fetching', async () => {
+  let called = false
+  const adapter = createComfyUIAdapter({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    promptNodeId: '6',
+    fetchImpl: async () => { called = true; return new Response('') },
+  })
+  await assert.rejects(adapter.downloadOutput({ filename: '../secret.png', subfolder: '', contentType: 'output' }), { code: 'INVALID_OUTPUT_METADATA', statusCode: 400 })
+  await assert.rejects(adapter.downloadOutput({ filename: 'payload.html', subfolder: '', contentType: 'output' }), { code: 'OUTPUT_TYPE_NOT_ALLOWED', statusCode: 415 })
+  assert.equal(called, false)
+})
+
+test('rejects output bodies larger than the configured limit', async () => {
+  const adapter = createComfyUIAdapter({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    promptNodeId: '6',
+    maxOutputBytes: 3,
+    fetchImpl: async () => new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'content-type': 'image/png' } }),
+  })
+  await assert.rejects(adapter.downloadOutput({ filename: 'render.png', subfolder: '', contentType: 'output' }), { code: 'OUTPUT_TOO_LARGE', statusCode: 413 })
+})
