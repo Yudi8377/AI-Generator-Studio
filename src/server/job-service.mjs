@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { createJobRequest, transitionJob } from '../lib/job-contract.mjs'
 
+function serviceError(message, code, statusCode) {
+  return Object.assign(new Error(message), { code, statusCode })
+}
+
 export function createJobService({ adapters = {} } = {}) {
   const jobs = new Map()
   const adapterFor = (job) => adapters[job.mode === 'local' ? 'local' : 'cloud']
@@ -61,6 +65,25 @@ export function createJobService({ adapters = {} } = {}) {
         // A transient polling failure must not erase the last known job status.
         return job
       }
+    },
+
+    async getOutput(jobId, outputIndex) {
+      if (!Number.isSafeInteger(outputIndex) || outputIndex < 0) {
+        throw serviceError('Output index must be a non-negative integer', 'INVALID_OUTPUT_INDEX', 400)
+      }
+      const job = await this.get(jobId)
+      if (!job) throw serviceError('Job not found', 'JOB_NOT_FOUND', 404)
+      if (job.status !== 'succeeded') {
+        throw serviceError('Outputs are available only after a job succeeds', 'JOB_OUTPUT_NOT_READY', 409)
+      }
+      if (!Array.isArray(job.outputs) || outputIndex >= job.outputs.length) {
+        throw serviceError('Output not found for this job', 'OUTPUT_NOT_FOUND', 404)
+      }
+      const adapter = adapterFor(job)
+      if (typeof adapter?.downloadOutput !== 'function') {
+        throw serviceError('Output retrieval is not supported by this adapter', 'OUTPUT_RETRIEVAL_UNAVAILABLE', 503)
+      }
+      return adapter.downloadOutput(job.outputs[outputIndex])
     },
   }
 }
