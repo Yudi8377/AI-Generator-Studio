@@ -75,7 +75,7 @@ The upstream DJNormality/AI_Generator project was reviewed as a reference. Its M
 - [x] Local Node API scaffold, health endpoint, request validation, and adapter-unavailable response
 - [x] Optional ComfyUI API workflow submission adapter with automated mock tests
 - [x] ComfyUI completion polling and bounded, validated output retrieval
-- [x] Connect Image Studio prompt submission, job polling, and first output preview (ComfyUI image/video outputs only)
+- [x] Connect Image Studio prompt submission, job polling, and first output preview (ComfyUI image/video outputs only)\n- [x] Single-process local runtime serving the built frontend and API from one origin
 - [ ] Opt-in cloud adapters with per-job cost estimates
 - [ ] Neon schema and migration on a review branch
 - [ ] Authenticated production API and end-to-end tests

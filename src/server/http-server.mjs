@@ -1,9 +1,54 @@
 import { createServer } from 'node:http'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { extname, resolve, sep } from 'node:path'
 import { createJobService } from './job-service.mjs'
 import { createComfyUIAdapter } from './comfyui-adapter.mjs'
 
 const MAX_BODY_BYTES = 32 * 1024
+const STATIC_MIME_TYPES = new Map([
+  ['.html', 'text/html; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'], ['.svg', 'image/svg+xml'], ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'], ['.jpeg', 'image/jpeg'], ['.webp', 'image/webp'],
+  ['.ico', 'image/x-icon'], ['.woff2', 'font/woff2'], ['.json', 'application/json; charset=utf-8'],
+])
+
+function sendStatic(response, statusCode, body, contentType, cacheControl = 'no-cache') {
+  response.writeHead(statusCode, {
+    'content-type': contentType,
+    'cache-control': cacheControl,
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'same-origin',
+    'cross-origin-resource-policy': 'same-origin',
+  })
+  response.end(body)
+}
+
+async function serveStatic(request, response, staticDir, pathname) {
+  let decoded
+  try {
+    decoded = decodeURIComponent(pathname)
+  } catch {
+    return sendJson(response, 400, { error: { code: 'INVALID_PATH', message: 'Invalid URL path' } })
+  }
+  const relative = decoded.replace(/^\/+/, '')
+  if (relative.split(/[\\/]/).some((part) => part === '..' || part.startsWith('.'))) {
+    return sendJson(response, 400, { error: { code: 'INVALID_PATH', message: 'Invalid static path' } })
+  }
+  const target = resolve(staticDir, relative || 'index.html')
+  if (target !== staticDir && !target.startsWith(staticDir + sep)) {
+    return sendJson(response, 400, { error: { code: 'INVALID_PATH', message: 'Invalid static path' } })
+  }
+  try {
+    const body = await readFile(target)
+    const extension = extname(target).toLowerCase()
+    const contentType = STATIC_MIME_TYPES.get(extension)
+    if (!contentType) return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'Static asset not found' } })
+    return sendStatic(response, 200, body, contentType, extension === '.html' ? 'no-cache' : 'public, max-age=3600')
+  } catch {
+    return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'Static asset not found' } })
+  }
+}
 
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
@@ -48,7 +93,7 @@ async function readJson(request) {
   }
 }
 
-export function createApiServer({ jobService = createJobService(), inference = 'not-configured' } = {}) {
+export function createApiServer({ jobService = createJobService(), inference = 'not-configured', staticDir = process.env.SERVE_FRONTEND === '1' ? resolve(process.cwd(), 'dist') : null } = {}) {
   return createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
 
@@ -86,6 +131,8 @@ export function createApiServer({ jobService = createJobService(), inference = '
         ? sendJson(response, 200, { job })
         : sendJson(response, 404, { error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } })
     }
+
+    if (request.method === 'GET' && staticDir) return serveStatic(request, response, staticDir, url.pathname)
 
     return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'Route not found' } })
   })

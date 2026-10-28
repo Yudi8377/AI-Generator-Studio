@@ -1,4 +1,7 @@
 import test from 'node:test'
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
 import { createApiServer } from '../src/server/http-server.mjs'
 
@@ -95,5 +98,34 @@ test('output route maps job service errors to structured HTTP errors', async () 
     assert.equal((await response.json()).error.code, 'JOB_NOT_FOUND')
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+  }
+})
+
+
+test('optional static hosting serves the built app and known assets only', async () => {
+  const staticDir = await mkdtemp(join(tmpdir(), 'ai-generator-static-'))
+  await mkdir(join(staticDir, 'assets'))
+  await writeFile(join(staticDir, 'index.html'), '<!doctype html><title>Studio</title>')
+  await writeFile(join(staticDir, 'assets', 'app.js'), 'console.log("studio")')
+  const server = createApiServer({ staticDir: resolve(staticDir) })
+  await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen))
+  const address = server.address()
+  try {
+    const root = await fetch(`http://127.0.0.1:${address.port}/`)
+    assert.equal(root.status, 200)
+    assert.match(root.headers.get('content-type') || '', /text\/html/)
+    assert.match(await root.text(), /Studio/)
+
+    const asset = await fetch(`http://127.0.0.1:${address.port}/assets/app.js`)
+    assert.equal(asset.status, 200)
+    assert.match(asset.headers.get('content-type') || '', /javascript/)
+    assert.match(await asset.text(), /console\.log/)
+
+    const missing = await fetch(`http://127.0.0.1:${address.port}/assets/missing.js`)
+    assert.equal(missing.status, 404)
+  } finally {
+    server.closeAllConnections?.()
+    await new Promise((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()))
+    await rm(staticDir, { recursive: true, force: true })
   }
 })
