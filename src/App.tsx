@@ -31,21 +31,29 @@ export default function App() {
 
   useEffect(() => {
     let activeRequest = true
-    fetch('/healthz')
-      .then(async (response) => {
+    void (async () => {
+      try {
+        const response = await fetch('/healthz', { cache: 'no-store' })
         if (!response.ok) throw new Error('API health check failed')
-        return await response.json() as ApiHealth
-      })
-      .then((health) => {
+        const health = await response.json() as ApiHealth
         if (!activeRequest) return
         setApiHealth('ready')
         setInference(health.inference || 'unknown')
-      })
-      .catch(() => {
+        if (health.inference === 'comfyui-configured') {
+          try {
+            const readiness = await fetch('/readyz', { cache: 'no-store' })
+            if (!activeRequest) return
+            setInference(readiness.ok ? 'ComfyUI reachable' : 'ComfyUI not reachable')
+          } catch {
+            if (activeRequest) setInference('ComfyUI not reachable')
+          }
+        }
+      } catch {
         if (!activeRequest) return
         setApiHealth('unavailable')
         setInference('API unavailable')
-      })
+      }
+    })()
     return () => { activeRequest = false }
   }, [])
 

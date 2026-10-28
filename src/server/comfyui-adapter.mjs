@@ -121,6 +121,14 @@ export function createComfyUIAdapter({ baseUrl, workflow, promptNodeId, promptIn
       return { status: 'queued' }
     },
 
+    async health() {
+      const payload = await jsonRequest(fetchImpl, endpoint('/system_stats'), timeoutMs)
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw makeError('ComfyUI returned an invalid health response', 'COMFYUI_INVALID_HEALTH_RESPONSE')
+      }
+      return { ok: true }
+    },
+
     async downloadOutput(output) {
       const safe = validateOutputMetadata(output)
       const url = new URL(endpoint('/view'))

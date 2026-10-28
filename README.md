@@ -3,7 +3,7 @@
 Hybrid-ready workspace for AI image generation, restoration, upscaling, video, face tools, and 3D workflows.
 
 ## Current status
-The React/Vite frontend and Node.js API scaffold are present. The optional ComfyUI adapter can submit a configured API-format workflow, poll ComfyUI history/queue, and retrieve validated output media through a job-scoped API route. Automated tests use mocked ComfyUI responses; real inference still requires a running ComfyUI server, compatible workflow, installed nodes, and model weights. No production persistence, authentication, or cloud inference provider is configured.
+The React/Vite frontend and Node.js API can run together locally. The optional ComfyUI adapter can submit a configured API-format workflow, check ComfyUI reachability through `/readyz`, poll ComfyUI history/queue, and retrieve validated output media through a job-scoped API route. Automated tests use mocked ComfyUI responses; real inference still requires a running ComfyUI server, compatible workflow, installed nodes, and model weights. No production persistence, authentication, or cloud inference provider is configured.
 
 ## Priorities
 1. Image generation
@@ -39,7 +39,7 @@ Terminal 2 — frontend:
 
     npm run dev
 
-Without ComfyUI configuration, API health reports `inference: "not-configured"` and job submission returns HTTP 503. To configure the local adapter, set these environment variables **in the API process environment**, not in browser code:
+The liveness endpoint `/healthz` reports whether the API process is running. The readiness endpoint `/readyz` performs a ComfyUI `/system_stats` probe and returns HTTP 200 only when the configured local inference service responds; otherwise it returns HTTP 503. Without ComfyUI configuration, inference reports `not-configured` and job submission returns HTTP 503. To configure the local adapter, set these environment variables **in the API process environment**, not in browser code:
 
 - `COMFYUI_URL`: base URL of the reachable ComfyUI server, for example `http://127.0.0.1:8188`.
 - `COMFYUI_WORKFLOW_PATH`: path to a ComfyUI API-format workflow JSON file.
@@ -75,7 +75,7 @@ The upstream DJNormality/AI_Generator project was reviewed as a reference. Its M
 - [x] Local Node API scaffold, health endpoint, request validation, and adapter-unavailable response
 - [x] Optional ComfyUI API workflow submission adapter with automated mock tests
 - [x] ComfyUI completion polling and bounded, validated output retrieval
-- [x] Connect Image Studio prompt submission, job polling, and first output preview (ComfyUI image/video outputs only)\n- [x] Single-process local runtime serving the built frontend and API from one origin
+- [x] Connect Image Studio prompt submission, job polling, and first output preview (ComfyUI image/video outputs only)\n- [x] Single-process local runtime serving the built frontend and API from one origin\n- [x] Separate liveness and ComfyUI readiness endpoints
 - [ ] Opt-in cloud adapters with per-job cost estimates
 - [ ] Neon schema and migration on a review branch
 - [ ] Authenticated production API and end-to-end tests
