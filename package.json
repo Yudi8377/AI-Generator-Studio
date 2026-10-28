@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "node src/server/http-server.mjs",
+    "start:local": "node scripts/start-local.mjs",
     "build": "tsc -b && vite build",
     "test": "node --test",
     "preview": "vite preview"
