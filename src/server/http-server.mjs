@@ -14,6 +14,19 @@ function sendJson(response, statusCode, body) {
   response.end(JSON.stringify(body))
 }
 
+function sendOutput(response, output) {
+  const safeFilename = output.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'output'
+  response.writeHead(200, {
+    'content-type': output.contentType,
+    'content-length': output.body.length,
+    'content-disposition': `inline; filename="${safeFilename}"`,
+    'cache-control': 'private, no-store',
+    'x-content-type-options': 'nosniff',
+    'cross-origin-resource-policy': 'same-origin',
+  })
+  response.end(output.body)
+}
+
 async function readJson(request) {
   const chunks = []
   let bytes = 0
@@ -52,6 +65,17 @@ export function createApiServer({ jobService = createJobService(), inference = '
         const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 400
         const code = error.code ?? (statusCode === 400 ? 'INVALID_REQUEST' : 'REQUEST_FAILED')
         return sendJson(response, statusCode, { error: { code, message: error.message } })
+      }
+    }
+
+    const outputMatch = request.method === 'GET' && url.pathname.match(/^\/api\/jobs\/([0-9a-f-]{36})\/outputs\/(\d+)$/i)
+    if (outputMatch) {
+      try {
+        const output = await jobService.getOutput(outputMatch[1], Number(outputMatch[2]))
+        return sendOutput(response, output)
+      } catch (error) {
+        const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 502
+        return sendJson(response, statusCode, { error: { code: error.code ?? 'OUTPUT_RETRIEVAL_FAILED', message: error.message } })
       }
     }
 
