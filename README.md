@@ -46,7 +46,7 @@ Without ComfyUI configuration, API health reports `inference: "not-configured"` 
 - `COMFYUI_PROMPT_NODE_ID`: node ID in that workflow whose input will receive the prompt.
 - `COMFYUI_PROMPT_INPUT`: optional input field name; defaults to `text`.
 
-All three required variables must be supplied together. The configured node and input field must exist in the workflow. Workflow JSON is user-supplied; ensure it is compatible with the installed ComfyUI nodes and model files. The adapter sends a prompt to ComfyUI's `/prompt` endpoint and records the returned `prompt_id`. The status endpoint polls ComfyUI history and queue, updates the job to running/succeeded/failed, and returns output file metadata. `GET /api/jobs/:id/outputs/:index` serves a completed job's output only after validating the job state and index; the adapter validates the filename/subfolder/type, limits output size (100 MiB by default), applies a timeout, and checks the returned content type. Output URLs are local API routes, not public ComfyUI URLs. Cancellation, durable job storage, authentication, and multi-user authorization are not implemented yet.
+All three required variables must be supplied together. The configured node and input field must exist in the workflow. Workflow JSON is user-supplied; ensure it is compatible with the installed ComfyUI nodes and model files. The adapter sends a prompt to ComfyUI's `/prompt` endpoint and records the returned `prompt_id`. The status endpoint polls ComfyUI history and queue, updates the job to running/succeeded/failed, and returns output file metadata. `GET /api/jobs/:id/outputs/:index` serves a completed job's output only after validating the job state and index; the adapter validates the filename/subfolder/type, limits output size (100 MiB by default), applies a timeout, and checks the returned content type. Output URLs are local API routes, not public ComfyUI URLs. The Image Studio UI can submit text prompts, poll job status, and preview the first returned image/video. It intentionally blocks source-file processing, cloud mode, and non-image workflows until those adapters are implemented. Cancellation, durable job storage, authentication, and multi-user authorization are not implemented yet.
 
 For security, keep ComfyUI and this API on a trusted local network. Do not expose ComfyUI directly to the public internet. Do not set `ALLOW_PUBLIC_BIND=1` on a public server without authentication, rate limiting, and deployment-specific security controls.
 
@@ -75,7 +75,7 @@ The upstream DJNormality/AI_Generator project was reviewed as a reference. Its M
 - [x] Local Node API scaffold, health endpoint, request validation, and adapter-unavailable response
 - [x] Optional ComfyUI API workflow submission adapter with automated mock tests
 - [x] ComfyUI completion polling and bounded, validated output retrieval
-- [ ] Connect frontend job submission and output preview
+- [x] Connect Image Studio prompt submission, job polling, and first output preview (ComfyUI image/video outputs only)
 - [ ] Opt-in cloud adapters with per-job cost estimates
 - [ ] Neon schema and migration on a review branch
 - [ ] Authenticated production API and end-to-end tests
