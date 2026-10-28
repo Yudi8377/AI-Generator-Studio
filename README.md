@@ -3,7 +3,7 @@
 Hybrid-ready workspace for AI image generation, restoration, upscaling, video, face tools, and 3D workflows.
 
 ## Current status
-The React/Vite frontend and Node.js API scaffold are present. An optional ComfyUI adapter can submit a configured API-format workflow to a reachable ComfyUI server and retain its external prompt ID. The API does not yet poll ComfyUI for completion or retrieve rendered output files; a queued job is not proof of successful media generation. No production persistence or cloud inference provider is configured.
+The React/Vite frontend and Node.js API scaffold are present. The optional ComfyUI adapter can submit a configured API-format workflow, poll ComfyUI history/queue, and retrieve validated output media through a job-scoped API route. Automated tests use mocked ComfyUI responses; real inference still requires a running ComfyUI server, compatible workflow, installed nodes, and model weights. No production persistence, authentication, or cloud inference provider is configured.
 
 ## Priorities
 1. Image generation
@@ -46,7 +46,7 @@ Without ComfyUI configuration, API health reports `inference: "not-configured"` 
 - `COMFYUI_PROMPT_NODE_ID`: node ID in that workflow whose input will receive the prompt.
 - `COMFYUI_PROMPT_INPUT`: optional input field name; defaults to `text`.
 
-All three required variables must be supplied together. The configured node and input field must exist in the workflow. Workflow JSON is user-supplied; ensure it is compatible with the installed ComfyUI nodes and model files. The adapter sends a prompt to ComfyUI's `/prompt` endpoint and records the returned `prompt_id`. The status endpoint now polls ComfyUI history and queue, updates the job to running/succeeded/failed, and returns output file metadata. It does not yet serve or download the media files themselves, and output metadata is not a public URL. Cancellation and durable job storage are not implemented yet.
+All three required variables must be supplied together. The configured node and input field must exist in the workflow. Workflow JSON is user-supplied; ensure it is compatible with the installed ComfyUI nodes and model files. The adapter sends a prompt to ComfyUI's `/prompt` endpoint and records the returned `prompt_id`. The status endpoint polls ComfyUI history and queue, updates the job to running/succeeded/failed, and returns output file metadata. `GET /api/jobs/:id/outputs/:index` serves a completed job's output only after validating the job state and index; the adapter validates the filename/subfolder/type, limits output size (100 MiB by default), applies a timeout, and checks the returned content type. Output URLs are local API routes, not public ComfyUI URLs. Cancellation, durable job storage, authentication, and multi-user authorization are not implemented yet.
 
 For security, keep ComfyUI and this API on a trusted local network. Do not expose ComfyUI directly to the public internet. Do not set `ALLOW_PUBLIC_BIND=1` on a public server without authentication, rate limiting, and deployment-specific security controls.
 
@@ -74,7 +74,7 @@ The upstream DJNormality/AI_Generator project was reviewed as a reference. Its M
 - [x] Provider-neutral job request contract and lifecycle transition tests
 - [x] Local Node API scaffold, health endpoint, request validation, and adapter-unavailable response
 - [x] Optional ComfyUI API workflow submission adapter with automated mock tests
-- [ ] ComfyUI completion polling and output retrieval
+- [x] ComfyUI completion polling and bounded, validated output retrieval
 - [ ] Connect frontend job submission and output preview
 - [ ] Opt-in cloud adapters with per-job cost estimates
 - [ ] Neon schema and migration on a review branch
