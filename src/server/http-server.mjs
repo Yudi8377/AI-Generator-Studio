@@ -132,7 +132,9 @@ export function createApiServer({ jobService = createJobService(), inference = '
         : sendJson(response, 404, { error: { code: 'JOB_NOT_FOUND', message: 'Job not found' } })
     }
 
-    if (request.method === 'GET' && staticDir) return serveStatic(request, response, staticDir, url.pathname)\n\n    return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'Route not found' } })
+    if (request.method === 'GET' && staticDir) return serveStatic(request, response, staticDir, url.pathname)
+
+    return sendJson(response, 404, { error: { code: 'NOT_FOUND', message: 'Route not found' } })
   })
 }
 
