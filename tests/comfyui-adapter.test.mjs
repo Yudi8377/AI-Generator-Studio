@@ -135,3 +135,17 @@ test('rejects output bodies larger than the configured limit', async () => {
   })
   await assert.rejects(adapter.downloadOutput({ filename: 'render.png', subfolder: '', contentType: 'output' }), { code: 'OUTPUT_TOO_LARGE', statusCode: 413 })
 })
+
+
+test('health probe confirms ComfyUI responds to system_stats', async () => {
+  const adapter = createComfyUIAdapter({
+    baseUrl: 'http://127.0.0.1:8188',
+    workflow,
+    promptNodeId: '6',
+    fetchImpl: async (url) => {
+      assert.equal(url, 'http://127.0.0.1:8188/system_stats')
+      return new Response(JSON.stringify({ system: { os: 'test' } }), { status: 200 })
+    },
+  })
+  assert.deepEqual(await adapter.health(), { ok: true })
+})
