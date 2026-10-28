@@ -67,6 +67,24 @@ export function createJobService({ adapters = {} } = {}) {
       }
     },
 
+    async checkInference() {
+      const adapter = adapters.local
+      if (!adapter) return { ok: false, code: 'INFERENCE_ADAPTER_UNAVAILABLE', message: 'Local inference adapter is not configured' }
+      if (typeof adapter.health !== 'function') return { ok: false, code: 'INFERENCE_HEALTHCHECK_UNAVAILABLE', message: 'Adapter does not provide a health check' }
+      try {
+        const result = await adapter.health()
+        return result?.ok === true
+          ? { ok: true }
+          : { ok: false, code: 'INFERENCE_UNREACHABLE', message: 'Inference adapter did not confirm readiness' }
+      } catch (error) {
+        return {
+          ok: false,
+          code: typeof error?.code === 'string' ? error.code : 'INFERENCE_UNREACHABLE',
+          message: typeof error?.message === 'string' ? error.message : 'Inference adapter is not reachable',
+        }
+      }
+    },
+
     async getOutput(jobId, outputIndex) {
       if (!Number.isSafeInteger(outputIndex) || outputIndex < 0) {
         throw serviceError('Output index must be a non-negative integer', 'INVALID_OUTPUT_INDEX', 400)
