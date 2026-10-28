@@ -31,15 +31,43 @@ Install dependencies:
 
     npm install
 
-Terminal 1 — API:
+### One-command local runtime (recommended)
+
+This builds the frontend and serves the UI plus API from one local origin:
+
+    npm run start:local
+
+Then open `http://127.0.0.1:8787`. Keep the terminal open while using the app. The API binds to loopback by default and is not exposed to other computers.
+
+For UI/API hot reload during development, use two terminals instead:
 
     npm run dev:api
-
-Terminal 2 — frontend:
-
     npm run dev
 
-The liveness endpoint `/healthz` reports whether the API process is running. The readiness endpoint `/readyz` performs a ComfyUI `/system_stats` probe and returns HTTP 200 only when the configured local inference service responds; otherwise it returns HTTP 503. Without ComfyUI configuration, inference reports `not-configured` and job submission returns HTTP 503. To configure the local adapter, set these environment variables **in the API process environment**, not in browser code:
+### Enable real local image generation on Windows PowerShell
+
+1. Start ComfyUI separately and confirm its own UI opens at `http://127.0.0.1:8188`.
+2. In ComfyUI, load a workflow that works with your installed model and nodes, then save/export it in **API format**. The regular UI workflow JSON may not be compatible.
+3. Find the text-encoding node and the exact input field that receives the prompt. The defaults expect a node input named `text`.
+4. In the repository's PowerShell terminal, set the environment variables below to match your workflow. Replace the example path and node ID with your actual values:
+
+    `$env:COMFYUI_URL = "http://127.0.0.1:8188"`
+    `$env:COMFYUI_WORKFLOW_PATH = "C:\\Users\\YOUR_USER\\ComfyUI\\workflow-api.json"`
+    `$env:COMFYUI_PROMPT_NODE_ID = "6"`
+    `$env:COMFYUI_PROMPT_INPUT = "text"`
+    `npm run start:local`
+
+The environment variables must be set in the same terminal before starting the API. Keep ComfyUI running. Do not commit workflow files if they contain private paths or credentials.
+
+### Verify readiness
+
+- Open `http://127.0.0.1:8787/healthz`: confirms the API process is alive.
+- Open `http://127.0.0.1:8787/readyz`: confirms ComfyUI responds to a system-stats request. This does **not** prove the workflow or model can generate an image.
+- Submit a simple prompt from Image Studio and wait for a completed job with a visible output. That is the first real end-to-end inference check.
+
+If `/readyz` returns 503, check that ComfyUI is running, `COMFYUI_URL` is correct, and the API was started in the same terminal where the environment variables were set. If readiness succeeds but generation fails, check the workflow's API-format JSON, node ID, prompt input, model weights, and any required custom nodes. Read the ComfyUI console for the underlying workflow error.
+
+The liveness endpoint `/healthz` reports whether the API process is running. The readiness endpoint `/readyz` performs a ComfyUI `/system_stats` probe and returns HTTP 200 only when the configured local inference service responds; otherwise it returns HTTP 503. This is a connectivity check, not a test of the configured model or workflow. Without ComfyUI configuration, inference reports `not-configured` and job submission returns HTTP 503. To configure the local adapter, set these environment variables **in the API process environment**, not in browser code:
 
 - `COMFYUI_URL`: base URL of the reachable ComfyUI server, for example `http://127.0.0.1:8188`.
 - `COMFYUI_WORKFLOW_PATH`: path to a ComfyUI API-format workflow JSON file.
