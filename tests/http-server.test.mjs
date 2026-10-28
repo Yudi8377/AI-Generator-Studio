@@ -129,3 +129,35 @@ test('optional static hosting serves the built app and known assets only', async
     await rm(staticDir, { recursive: true, force: true })
   }
 })
+
+
+test('readiness endpoint returns 503 until inference is actually reachable', async () => {
+  await withServer(async (baseUrl) => {
+    const response = await fetch(baseUrl + '/readyz')
+    assert.equal(response.status, 503)
+    const payload = await response.json()
+    assert.equal(payload.ok, false)
+    assert.equal(payload.error.code, 'INFERENCE_ADAPTER_UNAVAILABLE')
+  })
+})
+
+test('readiness endpoint returns 200 after adapter health succeeds', async () => {
+  const server = createApiServer({
+    inference: 'comfyui-configured',
+    jobService: {
+      async checkInference() { return { ok: true } },
+      async get() { return null },
+      async getOutput() { throw new Error('unused') },
+      async submit() { throw new Error('unused') },
+    },
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/readyz`)
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { ok: true, service: 'ai-generator-studio-api', inference: 'comfyui-ready' })
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+  }
+})
