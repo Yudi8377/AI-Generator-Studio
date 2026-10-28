@@ -112,3 +112,21 @@ test('does not serve outputs before job completion', async () => {
   const submitted = await service.submit(request)
   await assert.rejects(service.getOutput(submitted.id, 0), { code: 'JOB_OUTPUT_NOT_READY', statusCode: 409 })
 })
+
+
+test('reports inference readiness only when the configured adapter health check succeeds', async () => {
+  const missing = await createJobService().checkInference()
+  assert.equal(missing.ok, false)
+  assert.equal(missing.code, 'INFERENCE_ADAPTER_UNAVAILABLE')
+
+  const ready = await createJobService({
+    adapters: { local: { async submit() {}, async health() { return { ok: true } } } },
+  }).checkInference()
+  assert.deepEqual(ready, { ok: true })
+
+  const unreachable = await createJobService({
+    adapters: { local: { async submit() {}, async health() { throw Object.assign(new Error('connection refused'), { code: 'COMFYUI_UNREACHABLE' }) } } },
+  }).checkInference()
+  assert.equal(unreachable.ok, false)
+  assert.equal(unreachable.code, 'COMFYUI_UNREACHABLE')
+})
