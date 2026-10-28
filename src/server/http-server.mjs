@@ -101,6 +101,18 @@ export function createApiServer({ jobService = createJobService(), inference = '
       return sendJson(response, 200, { ok: true, service: 'ai-generator-studio-api', inference })
     }
 
+    if (request.method === 'GET' && url.pathname === '/readyz') {
+      const readiness = typeof jobService.checkInference === 'function'
+        ? await jobService.checkInference()
+        : { ok: false, code: 'INFERENCE_HEALTHCHECK_UNAVAILABLE', message: 'Inference readiness check is unavailable' }
+      return sendJson(response, readiness.ok ? 200 : 503, {
+        ok: readiness.ok,
+        service: 'ai-generator-studio-api',
+        inference: readiness.ok ? 'comfyui-ready' : inference,
+        ...(readiness.ok ? {} : { error: { code: readiness.code, message: readiness.message } }),
+      })
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/jobs') {
       try {
         const body = await readJson(request)
