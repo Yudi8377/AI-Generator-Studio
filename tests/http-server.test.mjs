@@ -49,3 +49,51 @@ test('rejects malformed JSON and unknown routes', async () => {
     assert.equal(missing.status, 404)
   })
 })
+
+
+test('output route serves bytes with safe media headers', async () => {
+  const id = '123e4567-e89b-12d3-a456-426614174000'
+  const server = createApiServer({
+    jobService: {
+      async getOutput(jobId, index) {
+        assert.equal(jobId, id)
+        assert.equal(index, 0)
+        return { body: Buffer.from('image-bytes'), contentType: 'image/png', filename: 'render.png' }
+      },
+      async get() { return null },
+      async submit() { throw new Error('unused') },
+    },
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/jobs/${id}/outputs/0`)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-type'), 'image/png')
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
+    assert.equal(response.headers.get('cache-control'), 'private, no-store')
+    assert.equal(await response.text(), 'image-bytes')
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+  }
+})
+
+test('output route maps job service errors to structured HTTP errors', async () => {
+  const id = '123e4567-e89b-12d3-a456-426614174000'
+  const server = createApiServer({
+    jobService: {
+      async getOutput() { throw Object.assign(new Error('Job not found'), { code: 'JOB_NOT_FOUND', statusCode: 404 }) },
+      async get() { return null },
+      async submit() { throw new Error('unused') },
+    },
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/jobs/${id}/outputs/0`)
+    assert.equal(response.status, 404)
+    assert.equal((await response.json()).error.code, 'JOB_NOT_FOUND')
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+  }
+})

@@ -83,3 +83,32 @@ test('polling errors preserve the last known job status', async () => {
   const polled = await service.get(submitted.id)
   assert.equal(polled.status, 'queued')
 })
+
+
+test('serves outputs only for successful jobs and valid output indexes', async () => {
+  const service = createJobService({
+    adapters: { local: {
+      async submit() { return { status: 'queued', externalId: 'output-job' } },
+      async inspect() { return { status: 'succeeded', outputs: [{ filename: 'render.png', subfolder: '', contentType: 'output' }] } },
+      async downloadOutput(output) { return { body: Buffer.from('png-bytes'), contentType: 'image/png', filename: output.filename } },
+    } },
+  })
+  const submitted = await service.submit(request)
+  const result = await service.getOutput(submitted.id, 0)
+  assert.equal(result.contentType, 'image/png')
+  assert.equal(result.body.toString(), 'png-bytes')
+  await assert.rejects(service.getOutput(submitted.id, 1), { code: 'OUTPUT_NOT_FOUND', statusCode: 404 })
+  await assert.rejects(service.getOutput(submitted.id, -1), { code: 'INVALID_OUTPUT_INDEX', statusCode: 400 })
+})
+
+test('does not serve outputs before job completion', async () => {
+  const service = createJobService({
+    adapters: { local: {
+      async submit() { return { status: 'queued', externalId: 'pending-job' } },
+      async inspect() { return { status: 'running' } },
+      async downloadOutput() { throw new Error('must not be called') },
+    } },
+  })
+  const submitted = await service.submit(request)
+  await assert.rejects(service.getOutput(submitted.id, 0), { code: 'JOB_OUTPUT_NOT_READY', statusCode: 409 })
+})
